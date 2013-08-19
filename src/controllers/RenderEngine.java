@@ -4,6 +4,7 @@ import gui.Gui;
 
 import java.awt.Color;
 import java.awt.Rectangle;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -20,7 +21,7 @@ public class RenderEngine {
 	private ArrayList<Polygon> polygons;
 	private Gui gui;
 	private Vector3D lightSource;
-	private Rectangle bounds;
+	private Rectangle2D.Float bounds;
 	private int width = 500;
 	private int height = 500;
 	private Color colourBuffer[][] = new Color[width][height];
@@ -43,7 +44,12 @@ public class RenderEngine {
 		// Load polygons
 		loadPolygons(input);
 		calculateBounds();
-		
+
+		// Scale if bigger than view area
+
+		// Transform to center
+		System.out.printf("Bounds: %s", bounds.toString());
+
 		// TODO translation for not centred (if it's smaller than view point)
 		// TODO rotation
 	}
@@ -53,16 +59,16 @@ public class RenderEngine {
 	 */
 	private void calculateBounds(){
 
-		int xMin = Integer.MAX_VALUE;
-		int yMin = Integer.MAX_VALUE;
-		int xMax = -Integer.MAX_VALUE;
-		int yMax = -Integer.MAX_VALUE;
+		float xMin = Integer.MAX_VALUE;
+		float yMin = Integer.MAX_VALUE;
+		float xMax = -Integer.MAX_VALUE;
+		float yMax = -Integer.MAX_VALUE;
 
 		for(Polygon p : polygons){
-			Rectangle r = p.getBounds();
+			Rectangle2D.Float r = p.getBounds();
 			if(r == null){System.out.println("Null bounds in polygon"); continue;}
-			int rxMax = r.x + r.width;
-			int ryMax = r.y + r.height;
+			float rxMax = r.x + r.width;
+			float ryMax = r.y + r.height;
 
 			xMin = r.x < xMin ? r.x : xMin;
 			yMin = r.y < yMin ? r.y : yMin;
@@ -70,7 +76,7 @@ public class RenderEngine {
 			yMax = ryMax > yMax ? ryMax : yMax;
 		}
 
-		bounds = new Rectangle(xMin, yMin, xMax - xMin, yMax - yMin);
+		bounds = new Rectangle2D.Float(xMin, yMin, xMax - xMin, yMax - yMin);
 	}
 
 	/**
@@ -110,25 +116,20 @@ public class RenderEngine {
 
 		for(Polygon p : polygons){
 			if(p.getNormal().z > 0) continue;
-			// TODO make the edgelist
-			Rectangle polyBounds = p.getBounds();
-			int minY = polyBounds.y;
-			int maxY = polyBounds.y + polyBounds.height;
-
-			EdgeListNode edgeList[] = new EdgeListNode[maxY+1];
-			System.out.println("Length: " + edgeList.length);
+			int polyHeight = (int)Math.ceil(p.getBounds().getMaxY());
+			EdgeListNode edgeList[] = new EdgeListNode[polyHeight];
 			parseEdge(edgeList, p.vertex(0), p.vertex(1));
 			parseEdge(edgeList, p.vertex(1), p.vertex(2));
 			parseEdge(edgeList, p.vertex(2), p.vertex(0));
-
+			
 			drawToZBuffer(p.getShade(lightSource, intensity, ambience), edgeList);
 		}
 
 
 	}
 
-	
-	
+
+
 	private void parseEdge(EdgeListNode[] edgeList, Vector3D from, Vector3D to){
 		Vector3D a = from.y < to.y ? from : to;
 		Vector3D b = a == from ? to : from;
@@ -138,8 +139,8 @@ public class RenderEngine {
 		float x = a.x;
 		float z = a.z;
 
-		int i = (int)a.y;
-		int maxi = (int)b.y;
+		int i = (int)Math.floor(a.y);
+		int maxi = (int)Math.ceil(b.y);
 		while(i < maxi){
 			// Initialise the item in the edge list if it does not exist
 			if(edgeList[i] == null) edgeList[i] = new EdgeListNode();
@@ -148,14 +149,14 @@ public class RenderEngine {
 			x = x + mx;
 			z = z + mz;
 		}
-		if(edgeList[maxi] == null) edgeList[maxi] = new EdgeListNode();
-		edgeList[maxi].putPoint(x, z);
+		if(edgeList[maxi - 1] == null) edgeList[maxi - 1] = new EdgeListNode();
+		edgeList[maxi - 1].putPoint(x, z);
 	}
 
 	private void initialiseZBuffer(){
 		for(int h = 0; h < this.height; h++){
 			for(int w = 0; w < this.width; w++){
-				colourBuffer[w][h] = Color.WHITE;
+				colourBuffer[w][h] = Color.GRAY;
 				zBuffer[w][h] = Integer.MAX_VALUE;
 			}
 		}
@@ -170,14 +171,15 @@ public class RenderEngine {
 			int mz = (int)((node.rightZ() - node.leftZ()) / (node.rightX() - node.leftX()));
 
 			while(x <= (int)node.rightX()){
+				if(x < 0 || y < 0 || x >= width || y >= height) {x++;z += mz; continue;}
 				if(z < zBuffer[x][y]){
 					zBuffer[x][y] = z;
 					colourBuffer[x][y] = colour;
 				}
 				x++;
-				z = z + mz;
+				z += mz;
 			}
 		}
 	}
-	
+
 }

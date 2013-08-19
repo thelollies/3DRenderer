@@ -37,6 +37,6 @@ public class Gui extends JFrame{
 	}
 
 	public static void main(String args[]){
-		new Gui("ball.txt");
+		new Gui("monkey.txt");
 	}
 }

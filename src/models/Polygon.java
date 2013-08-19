@@ -2,6 +2,7 @@ package models;
 
 import java.awt.Color;
 import java.awt.Rectangle;
+import java.awt.geom.Rectangle2D;
 import java.util.Formatter;
 
 public class Polygon {
@@ -11,7 +12,8 @@ public class Polygon {
 	private Color shade;
 	private Vector3D normal;
 	private Vector3D vertices[];
-	private Rectangle bounds;
+	private Rectangle2D.Float bounds;
+	private float height;
 
 	public Polygon(Vector3D vertices[], Color reflectivity){
 		assert(vertices.length == 3);
@@ -22,6 +24,7 @@ public class Polygon {
 		this.reflectivity = reflectivity;
 		calculateNormal();
 		bounds();
+		height();
 	}
 	
 	public Color getShade(Vector3D lightNormal, Color intensity, Color ambience){
@@ -70,12 +73,28 @@ public class Polygon {
 			yMax = v.y > yMax ? v.y : yMax;
 		}
 
-		bounds = new Rectangle((int)xMin, (int)yMin, (int)Math.ceil(xMax - xMin), (int)Math.ceil(yMax - yMin));
+		bounds = new Rectangle2D.Float(xMin, yMin, xMax - xMin, yMax - yMin);
 		
 	}
 
-	public Rectangle getBounds(){
+	public Rectangle2D.Float getBounds(){
 		return bounds;
+	}
+	
+	private void height(){
+		float miny = Float.MAX_VALUE;
+		float maxy = -Float.MAX_VALUE;
+		
+		for(int i = 0; i < vertices.length; i++){
+			miny = vertices[i].y < miny ? vertices[i].y : miny;
+			maxy = vertices[i].y > maxy ? vertices[i].y : maxy;
+		}
+		
+		this.height =  maxy - miny;
+	}
+	
+	public float getHeight(){
+		return height;
 	}
 
 	private void calculateNormal(){
@@ -102,7 +121,7 @@ public class Polygon {
 				reflectivity.getBlue());
 		bounds();
 		if(bounds != null)
-			f.format("b:(%3d %3d %3d %3d)",
+			f.format("b:(%3f %3f %3f %3f)",
 					bounds.x, bounds.y, bounds.width, bounds.height);
 		if (shade!=null) {
 			f.format("s:(%3d-%3d-%3d)",
