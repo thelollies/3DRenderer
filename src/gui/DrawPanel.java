@@ -1,30 +1,32 @@
 package gui;
 
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
-import java.beans.Transient;
-import java.io.File;
+import java.awt.image.BufferedImage;
 
 import javax.swing.JPanel;
 
 public class DrawPanel extends JPanel{
 
 	private Dimension size = new Dimension(500,500);
+	private BufferedImage img;
 
 	public DrawPanel(){
 		super();
 	}
 
+	public void drawImage(BufferedImage img){
+		this.img = img;
+		repaint();
+	}
+	
 	@Override
 	public void paint(Graphics g) {
 		super.paint(g);
-		g.setColor(Color.red);
-		g.drawRect(5, 5, 80, 80);
+		if(img != null) g.drawImage(img, 0, 0, null);
 	}
 
 	@Override
-	@Transient
 	public Dimension getPreferredSize() {
 		return size;
 	}

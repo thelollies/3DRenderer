@@ -1,5 +1,6 @@
 package gui;
 
+import java.awt.image.BufferedImage;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 
@@ -30,8 +31,12 @@ public class Gui extends JFrame{
 		drawPanel = new DrawPanel();
 		return drawPanel;
 	}
+	
+	public void drawImage(BufferedImage img){
+		drawPanel.drawImage(img);
+	}
 
 	public static void main(String args[]){
-		new Gui("tetras.txt");
+		new Gui("ball.txt");
 	}
 }

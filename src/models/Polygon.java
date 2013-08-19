@@ -23,6 +23,38 @@ public class Polygon {
 		calculateNormal();
 		bounds();
 	}
+	
+	public Color getShade(Vector3D lightNormal, Color intensity, Color ambience){
+		float costh = normal.dotProduct(lightNormal);
+		
+		// Colour component intensity
+		float ir = intensity.getRed() / 255f;
+		float ig = intensity.getGreen() / 255f;
+		float ib = intensity.getBlue() / 255f;
+		
+		// Colour component ambience
+		float ar = ambience.getRed() / 255f;
+		float ag = ambience.getGreen() / 255f;
+		float ab = ambience.getBlue() / 255f;
+		
+		int r = (int)((ar + (ir * costh)) * reflectivity.getRed());
+		int g = (int)((ag + (ig * costh)) * reflectivity.getGreen());
+		int b = (int)((ab + (ib * costh)) * reflectivity.getBlue());
+		
+		// Restrict colour components to range (0-255)
+		r = r >= 0 ? r : 0;
+		g = g >= 0 ? g : 0;
+		b = b >= 0 ? b : 0;
+		r = r <= 255 ? r : 255;
+		g = g <= 255 ? g : 255;
+		b = b <= 255 ? b : 255;
+		
+		return new Color(r, g, b);
+	}
+	
+	public Vector3D getNormal(){
+		return normal;
+	}
 
 	private void bounds(){
 		float xMin = Float.MAX_VALUE;
@@ -38,7 +70,8 @@ public class Polygon {
 			yMax = v.y > yMax ? v.y : yMax;
 		}
 
-		bounds = new Rectangle((int)xMin, (int)yMin, (int)(xMax - xMin), (int)(yMax - yMin));
+		bounds = new Rectangle((int)xMin, (int)yMin, (int)Math.ceil(xMax - xMin), (int)Math.ceil(yMax - yMin));
+		
 	}
 
 	public Rectangle getBounds(){
@@ -77,6 +110,10 @@ public class Polygon {
 		f.close();
 		return ans.toString();
 	}
+	
+	public Color getReflectivity(){
+		return reflectivity;
+	}
 
 	/**
 	 * Returns the polygon equivalent form a line with 9 floats followed by 4 ints.
@@ -109,5 +146,16 @@ public class Polygon {
 		Color reflect = new Color(r, g, b);
 
 		return new Polygon(polyVertices, reflect);
+	}
+	
+	/**
+	 * Gets the specified vertex from 0-2
+	 * @param vertexNo
+	 * @return
+	 */
+	public Vector3D vertex(int vertexNo){
+		assert(vertexNo >= 0 && vertexNo <= 2);
+		if(vertexNo < 0 || vertexNo > 2) return null;
+		return vertices[vertexNo];
 	}
 }
