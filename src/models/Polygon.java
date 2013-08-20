@@ -26,24 +26,24 @@ public class Polygon {
 		bounds();
 		height();
 	}
-	
+
 	public Color getShade(Vector3D lightNormal, Color intensity, Color ambience){
 		float costh = normal.dotProduct(lightNormal);
-		
+
 		// Colour component intensity
 		float ir = intensity.getRed() / 255f;
 		float ig = intensity.getGreen() / 255f;
 		float ib = intensity.getBlue() / 255f;
-		
+
 		// Colour component ambience
 		float ar = ambience.getRed() / 255f;
 		float ag = ambience.getGreen() / 255f;
 		float ab = ambience.getBlue() / 255f;
-		
+
 		int r = (int)((ar + (ir * costh)) * reflectivity.getRed());
 		int g = (int)((ag + (ig * costh)) * reflectivity.getGreen());
 		int b = (int)((ab + (ib * costh)) * reflectivity.getBlue());
-		
+
 		// Restrict colour components to range (0-255)
 		r = r >= 0 ? r : 0;
 		g = g >= 0 ? g : 0;
@@ -51,12 +51,22 @@ public class Polygon {
 		r = r <= 255 ? r : 255;
 		g = g <= 255 ? g : 255;
 		b = b <= 255 ? b : 255;
-		
-		return new Color(r, g, b);
+
+		shade = new Color(r, g, b);
+		return shade;
 	}
-	
+
 	public Vector3D getNormal(){
 		return normal;
+	}
+
+	public void applyMatrix(Matrix4D matrix){
+		for(int i = 0; i < vertices.length; i++){
+			vertices[i] = matrix.multiplyByVector(vertices[i]);
+		}
+
+		bounds();
+		calculateNormal();
 	}
 
 	private void bounds(){
@@ -74,25 +84,25 @@ public class Polygon {
 		}
 
 		bounds = new Rectangle2D.Float(xMin, yMin, xMax - xMin, yMax - yMin);
-		
+
 	}
 
 	public Rectangle2D.Float getBounds(){
 		return bounds;
 	}
-	
+
 	private void height(){
 		float miny = Float.MAX_VALUE;
 		float maxy = -Float.MAX_VALUE;
-		
+
 		for(int i = 0; i < vertices.length; i++){
 			miny = vertices[i].y < miny ? vertices[i].y : miny;
 			maxy = vertices[i].y > maxy ? vertices[i].y : maxy;
 		}
-		
+
 		this.height =  maxy - miny;
 	}
-	
+
 	public float getHeight(){
 		return height;
 	}
@@ -129,7 +139,7 @@ public class Polygon {
 		f.close();
 		return ans.toString();
 	}
-	
+
 	public Color getReflectivity(){
 		return reflectivity;
 	}
@@ -166,7 +176,7 @@ public class Polygon {
 
 		return new Polygon(polyVertices, reflect);
 	}
-	
+
 	/**
 	 * Gets the specified vertex from 0-2
 	 * @param vertexNo

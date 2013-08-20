@@ -3,7 +3,6 @@ package controllers;
 import gui.Gui;
 
 import java.awt.Color;
-import java.awt.Rectangle;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
@@ -12,6 +11,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import models.EdgeListNode;
+import models.Matrix4D;
 import models.Polygon;
 import models.Vector3D;
 
@@ -25,7 +25,7 @@ public class RenderEngine {
 	private int width = 500;
 	private int height = 500;
 	private Color colourBuffer[][] = new Color[width][height];
-	private int zBuffer[][] = new int[width][height];
+	private float zBuffer[][] = new float[width][height];
 	private Color intensity = new Color(100,100,100);
 	private Color ambience = new Color(255,255,255);
 
@@ -46,12 +46,34 @@ public class RenderEngine {
 		calculateBounds();
 
 		// Scale if bigger than view area
+		scaleDown();
+		transformToCenter();
 
 		// Transform to center
-		System.out.printf("Bounds: %s", bounds.toString());
+		System.out.printf("Bounds: %s\n", bounds.toString());
+	}
 
-		// TODO translation for not centred (if it's smaller than view point)
-		// TODO rotation
+	public void rotateOnY(float angleY){
+		for(Polygon p : polygons){
+			p.applyMatrix(Matrix4D.yRotateMatrix(angleY));
+		}
+		calculateBounds();
+		draw();
+	}
+
+	private void scaleDown(){
+		// If it doesn't need to be scaled, don't scale;
+		if(bounds.width <= this.width && bounds.height <= this.height) return;
+	}
+
+	private void transformToCenter(){
+		// If it is already centred, don't do anything
+		if(width/2 == (int)bounds.getCenterX() && height/2 == (int)bounds.getCenterY())return;
+
+		float transformX = (int)((width / 2) - bounds.getCenterX());
+		float transformY = (int)((height / 2) - bounds.getCenterY());
+
+		// TODO apply the transformation
 	}
 
 	/**
@@ -116,41 +138,47 @@ public class RenderEngine {
 
 		for(Polygon p : polygons){
 			if(p.getNormal().z > 0) continue;
-			int polyHeight = (int)Math.ceil(p.getBounds().getMaxY());
-			EdgeListNode edgeList[] = new EdgeListNode[polyHeight];
+
+			int polyHeight = (int)Math.floor(p.getBounds().getMaxY());
+
+			EdgeListNode edgeList[] = new EdgeListNode[polyHeight+1];
+
 			parseEdge(edgeList, p.vertex(0), p.vertex(1));
 			parseEdge(edgeList, p.vertex(1), p.vertex(2));
 			parseEdge(edgeList, p.vertex(2), p.vertex(0));
-			
+
+			long start = System.currentTimeMillis();
 			drawToZBuffer(p.getShade(lightSource, intensity, ambience), edgeList);
+			if(System.currentTimeMillis() - start > 10){
+				System.out.println(System.currentTimeMillis() - start);
+			}
 		}
 
 
 	}
 
-
-
 	private void parseEdge(EdgeListNode[] edgeList, Vector3D from, Vector3D to){
 		Vector3D a = from.y < to.y ? from : to;
 		Vector3D b = a == from ? to : from;
+
+		int i = (int)Math.floor(a.y);
+		int maxi = (int)Math.floor(b.y);
 
 		float mx = (b.x - a.x)/(b.y - a.y);
 		float mz = (b.z - a.z)/(b.y - a.y);
 		float x = a.x;
 		float z = a.z;
 
-		int i = (int)Math.floor(a.y);
-		int maxi = (int)Math.ceil(b.y);
 		while(i < maxi){
 			// Initialise the item in the edge list if it does not exist
 			if(edgeList[i] == null) edgeList[i] = new EdgeListNode();
 			edgeList[i].putPoint(x, z);
 			i++;
-			x = x + mx;
-			z = z + mz;
+			x += mx;
+			z += mz;
 		}
-		if(edgeList[maxi - 1] == null) edgeList[maxi - 1] = new EdgeListNode();
-		edgeList[maxi - 1].putPoint(x, z);
+		if(edgeList[maxi] == null) edgeList[maxi] = new EdgeListNode();
+		edgeList[maxi].putPoint(x, z);
 	}
 
 	private void initialiseZBuffer(){
@@ -163,14 +191,15 @@ public class RenderEngine {
 	}
 
 	private void drawToZBuffer(Color colour, EdgeListNode[] edgeList){
-		for(int y = 0;y < edgeList.length; y++){
+		for(int y = 0; y < edgeList.length; y++){
 			EdgeListNode node = edgeList[y];
 			if(node == null) continue;
-			int x = (int)node.leftX();
-			int z = (int)node.leftZ();
-			int mz = (int)((node.rightZ() - node.leftZ()) / (node.rightX() - node.leftX()));
 
-			while(x <= (int)node.rightX()){
+			int x = (int)node.leftX();
+			float z = node.leftZ();
+			float mz = ((node.rightZ() - node.leftZ()) / (node.rightX() - node.leftX()));
+
+			while(x <= (int)Math.floor(node.rightX())){ //TODO round up?
 				if(x < 0 || y < 0 || x >= width || y >= height) {x++;z += mz; continue;}
 				if(z < zBuffer[x][y]){
 					zBuffer[x][y] = z;
@@ -179,6 +208,7 @@ public class RenderEngine {
 				x++;
 				z += mz;
 			}
+
 		}
 	}
 
