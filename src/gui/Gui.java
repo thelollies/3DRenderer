@@ -1,8 +1,11 @@
 package gui;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.image.BufferedImage;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -15,25 +18,33 @@ import javax.swing.JPanel;
 import controllers.RenderEngine;
 
 public class Gui extends JFrame{
+
 	private DrawPanel drawPanel;
 	private RenderEngine renderEngine;
+	private Dimension panelSize = new Dimension(600,600);
 	public Gui(String fileName){
+
 		setLayout(new BorderLayout());
 		add(interactPanel(), BorderLayout.NORTH);
 		add(createRenderPanel(), BorderLayout.WEST);
 
 		// Start the render engine
 		try{
-			renderEngine = new RenderEngine(this, new FileReader(fileName));
+			renderEngine = new RenderEngine(this, new FileReader(fileName), panelSize.width, panelSize.height);
 			renderEngine.draw();
 		}catch(FileNotFoundException e){
 			System.out.printf("File: %s not found, exiting...", fileName);
 			System.exit(0);
 		}
 
+		this.setFocusable(true);
+		this.addKeyListener(new RotateListener());
+
 		pack();
 		setVisible(true);
 	}
+
+
 
 	private JPanel interactPanel(){
 		JPanel interactPanel = new JPanel();
@@ -44,11 +55,11 @@ public class Gui extends JFrame{
 
 		rotateLeft.addActionListener(new ActionListener(){
 			@Override	public void actionPerformed(ActionEvent e) {
-				renderEngine.rotateOnY(20f);
+				renderEngine.rotateOnY(0.1f);
 			}});
 		rotateRight.addActionListener(new ActionListener(){
 			@Override	public void actionPerformed(ActionEvent e) {
-				renderEngine.rotateOnY(-20f);
+				renderEngine.rotateOnY(-0.1f);
 			}});
 
 		interactPanel.add(rotateLeft);
@@ -58,7 +69,7 @@ public class Gui extends JFrame{
 	}
 
 	private DrawPanel createRenderPanel(){
-		drawPanel = new DrawPanel();
+		drawPanel = new DrawPanel(panelSize);
 		return drawPanel;
 	}
 
@@ -67,6 +78,30 @@ public class Gui extends JFrame{
 	}
 
 	public static void main(String args[]){
-		new Gui("monkey.txt");
+		new Gui("shapes.txt");
 	}
+
+	private class RotateListener implements KeyListener{
+
+		@Override
+		public void keyPressed(KeyEvent e) {
+			if(e.getKeyCode() == KeyEvent.VK_LEFT){
+				renderEngine.rotateOnY(0.1f);
+			}
+			else if(e.getKeyCode() == KeyEvent.VK_RIGHT){
+				renderEngine.rotateOnY(-0.1f);
+			}
+			else if(e.getKeyCode() == KeyEvent.VK_UP){
+				renderEngine.rotateOnX(-0.1f);
+			}
+			else if(e.getKeyCode() == KeyEvent.VK_DOWN){
+				renderEngine.rotateOnX(0.1f);
+			}
+		}
+
+		@Override	public void keyReleased(KeyEvent e) {}
+		@Override	public void keyTyped(KeyEvent e) {}
+
+	}
+
 }

@@ -5,6 +5,8 @@ import java.awt.Rectangle;
 import java.awt.geom.Rectangle2D;
 import java.util.Formatter;
 
+import controllers.Transform;
+
 public class Polygon {
 
 	private boolean hidden;
@@ -14,6 +16,8 @@ public class Polygon {
 	private Vector3D vertices[];
 	private Rectangle2D.Float bounds;
 	private float height;
+	private float zMin;
+	private float zMax;
 
 	public Polygon(Vector3D vertices[], Color reflectivity){
 		assert(vertices.length == 3);
@@ -60,9 +64,9 @@ public class Polygon {
 		return normal;
 	}
 
-	public void applyMatrix(Matrix4D matrix){
+	public void applyTransform(Transform transform){
 		for(int i = 0; i < vertices.length; i++){
-			vertices[i] = matrix.multiplyByVector(vertices[i]);
+			vertices[i] = transform.multiply(vertices[i]);
 		}
 
 		bounds();
@@ -72,19 +76,34 @@ public class Polygon {
 	private void bounds(){
 		float xMin = Float.MAX_VALUE;
 		float yMin = Float.MAX_VALUE;
+		float zMin = Float.MAX_VALUE;
 		float xMax = -Float.MAX_VALUE;
 		float yMax = -Float.MAX_VALUE;
+		float zMax = -Float.MAX_VALUE;
 
 		for(int i = 0; i < vertices.length; i++){
 			Vector3D v = vertices[i];
 			xMin = v.x < xMin ? v.x : xMin;
 			yMin = v.y < yMin ? v.y : yMin;
+			zMin = v.z < zMin ? v.z : zMin;
 			xMax = v.x > xMax ? v.x : xMax;
 			yMax = v.y > yMax ? v.y : yMax;
+			zMax = v.z > zMax ? v.z : zMax;
 		}
+
+		this.zMin = zMin;
+		this.zMax = zMax;
 
 		bounds = new Rectangle2D.Float(xMin, yMin, xMax - xMin, yMax - yMin);
 
+	}
+
+	public float getZMin(){
+		return zMax;
+	}
+
+	public float getZMax(){
+		return zMax;
 	}
 
 	public Rectangle2D.Float getBounds(){
