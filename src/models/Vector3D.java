@@ -31,6 +31,14 @@ public class Vector3D{
 	this.z = z;
 	this.mag = mag;
     }
+    
+    /** A Cloning constructor */
+    private Vector3D(Vector3D v){
+    	this.x = v.x;
+    	this.y = v.y;
+    	this.z = v.z;
+    	this.mag = v.mag;
+    }
 
     /** Constructs and returns a unit vector in the same direction
      *  as this vector.  */
@@ -82,6 +90,10 @@ public class Vector3D{
     	return new Vector3D(x, y, z);
     }
 
+    public Vector3D clone(){
+    	return new Vector3D(this);
+    }
+    
     public String toString(){
         StringBuilder ans = new StringBuilder("Vect:");
 	ans.append('(').append(x).append(',').append(y).append(',').append(z).append(')');

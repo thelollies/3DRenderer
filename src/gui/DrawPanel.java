@@ -17,7 +17,6 @@ public class DrawPanel extends JPanel{
 	public DrawPanel(Dimension size){
 		super();
 		this.size = size;
-		this.setFocusable(true);
 	}
 
 	public void drawImage(BufferedImage img){

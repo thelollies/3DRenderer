@@ -3,8 +3,6 @@ package controllers;
 import gui.Gui;
 
 import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
@@ -14,21 +12,14 @@ import java.util.ArrayList;
 
 import models.EdgeListNode;
 import models.Polygon;
+import models.Transform;
 import models.Vector3D;
 
 // TODO javadoc/commenting
-// TODO make the rotate work as described not by rotating all
-// the polygons (e.g. rotate the camera and draw relative to it rather than the polys
-// themselves as this means the lightsource cannot be observed)
+// Change the lightsource to be adjustable (direction and intensity) and handle multiple sources
+// add ctrl or shift combo for z translating (and maybe z rotate?)
+// add proper loading & saving
 
-// Change the lightsource to be adjustable
-// Fix the zbuffer error (HINT: only happens when the poly has a horizontal edge)
-// Optimisations (e.g. make polygons an  arry of polygons rather than arraylist)
-// Do mouse drag rotations (and use ctrl to allow z rotation too)
-// have shortcut for translations and rotations using the mouse plus allow
-// a reset position, reset scale buttons
-// fix buttons to avoid them holding focus (tell them to relinquish focus once they're done or
-// set allowfocus to false)
 
 
 public class RenderEngine {
@@ -43,77 +34,99 @@ public class RenderEngine {
 	private Color colourBuffer[][];
 	private float zBuffer[][];
 	private Color intensity = new Color(100,100,100);
-	private Color ambience = new Color(255,255,255);
+	private Color ambience = new Color(200,200,200);
 	private float zMin;
 	private float zMax;
+	private Transform translate;
+	private Transform rotate;
+	private Transform scale;
+	private String file;
 
-	public RenderEngine(Gui gui, FileReader file, int width, int height){
+	public RenderEngine(Gui gui, String file, int width, int height){
 		this.gui = gui;
 		this.width = width;
 		this.height = height;
+		this.file = file;
+
+		initialiseRenderer();
+	}
+
+	private void initialiseRenderer(){
 		colourBuffer = new Color[width][height];
 		zBuffer = new float[width][height];
-
-		System.out.println(this.width + " " + this.height);
-
-		// Text file reader
-		BufferedReader input = new BufferedReader(file);
-
-		// Get the lightsource
+		scale = null;
+		translate = null;
+		rotate = null;
+		
+		// Load lightsource and polygons
 		try{
-			lightSource = Vector3D.loadVector3D(input.readLine()).unitVector();
+			BufferedReader input = new BufferedReader(new FileReader(file));
+			lightSource = Vector3D.loadVector3D(input.readLine());
+			polygons = loadPolygons(input);
 		}
 		catch(IOException e){e.printStackTrace();System.exit(0);}
 
 		// Load polygons
-		loadPolygons(input);
 		calculateBounds();
-		transformPolygons(getCentreTranslation());
 
-		// Scale if bigger than view area
-		scaleDown();
+		// Transform and the polygons to make [0,0,0] the centre of the polygons
+		float polyX = bounds.x + (bounds.width / 2);
+		float polyY = bounds.y + (bounds.height / 2);
+		float polyZ = zMin + ((zMax - zMin)/2);
+		transformPolygons(Transform.newTranslation(0-polyX, 0-polyY, 0-polyZ));
 
-		// Transform to center
-		System.out.printf("Bounds: %s\n", bounds.toString());
+		// Scale the polygons if they do not fit in the viewing area
+		// Check to see that they don't already fit before scaling
+		if(bounds.width > this.width || bounds.height > this.height){
+
+			float widthScale = this.width / bounds.width;
+			float heightScale = this.height / bounds.height;
+			float scale = widthScale < heightScale ? widthScale : heightScale;
+
+			transformPolygons(Transform.newScale(scale, scale, scale));
+		}
+
 	}
 
+	public void resetModel(){
+		initialiseRenderer();
+	}
+	
 	private void transformPolygons(Transform t) {
 		for(Polygon p : polygons)
 			p.applyTransform(t);
 		calculateBounds();
+		//lightSource = t.multiply(lightSource);
 	}
 
-	private Transform getCentreTranslation() {
-		float polyX = bounds.x + (bounds.width / 2);
-		float polyY = bounds.y + (bounds.height / 2);
-		float polyZ = zMin + ((zMax - zMin)/2);
-
-		float desiredX = 0;
-		float desiredY = 0;
-		float desiredZ = 0;
-
-		return Transform.newTranslation(0-polyX, 0-polyY, 0-polyZ);
-	}
-
-	public void rotateOnY(float angleY){
-		transformPolygons(Transform.newYRotation(angleY));
+	public void rotate(float x, float y){
+		rotate = Transform.newYRotation((-2*x)/this.width);
+		rotate = rotate.compose(Transform.newXRotation((2*y)/this.height));
 		draw();
 	}
 
-	public void rotateOnX(float angleY){
-		transformPolygons(Transform.newXRotation(angleY));
+	public void translate(float x, float y){
+		translate = Transform.newTranslation(x, y, 0);
 		draw();
 	}
 
-	public void rotateOnZ(float angleY){
-		transformPolygons(Transform.newZRotation(angleY));
-
+	public void scale(float s){
+		scale = Transform.newScale(s, s, s);
 		draw();
 	}
 
-	private void scaleDown(){
-		// If it doesn't need to be scaled, don't scale;
-		if(bounds.width <= this.width && bounds.height <= this.height) return;
+	public void applyTransform(){
+		if(translate != null){
+			transformPolygons(translate);
+			translate = null;
+			draw();
+		}
+		else if(rotate != null){
+			transformPolygons(rotate);
+			lightSource = rotate.multiply(lightSource);
+			rotate = null;
+			draw();
+		}
 	}
 
 	/**
@@ -150,29 +163,37 @@ public class RenderEngine {
 	}
 
 	/**
-	 *
+	 * Loads polygons and returns an arraylist of those polygons. Input should
+	 * be a buffered reader pointing to a set of lines corresponding to polygons
+	 * with 9 floats for vertices and 3 more numbers for colour.
 	 * @param input
+	 * @return
+	 * @throws IOException
 	 */
-
-	private void loadPolygons(BufferedReader input){
-		polygons = new ArrayList<Polygon>();
+	private ArrayList<Polygon> loadPolygons(BufferedReader input) throws IOException{
+		ArrayList<Polygon> polys = new ArrayList<Polygon>();
 
 		// Read the polygons
 		String currentLine;
-		try{
-			while((currentLine = input.readLine()) != null){
-				Polygon p = Polygon.loadPolygon(currentLine);
-				polygons.add(p);
-			}
-		}catch(IOException e){e.printStackTrace();}
+		while((currentLine = input.readLine()) != null)
+			polys.add(Polygon.loadPolygon(currentLine));
+
+		return polys;
 	}
 
+	/**
+	 * Draws the polygons to the gui.
+	 */
 	public void draw(){
 		initialiseZBuffer();
 		generateZBuffer();
 		gui.drawImage(getImage());
 	}
 
+	/**
+	 * Converts the z buffer to a 2D image
+	 * @return
+	 */
 	public BufferedImage getImage(){
 		BufferedImage img = new BufferedImage(this.width, this.height, BufferedImage.TYPE_INT_RGB);
 
@@ -187,30 +208,48 @@ public class RenderEngine {
 		return img;
 	}
 
+	/**
+	 * Populates the z buffer from polygons
+	 */
 	private void generateZBuffer(){
+		Vector3D lightSourceCopy = lightSource.clone();
+		if(rotate != null)	lightSourceCopy = rotate.multiply(lightSource);
 
-		for(Polygon p : polygons){
+		Transform t = Transform.identity();
+		if(translate != null) t = t.compose(translate);
+		if(rotate != null) t = t.compose(rotate);
+		if(scale != null) t = t.compose(scale);
+		
+		
+		for(Polygon pOriginal : polygons){
+			Polygon p = pOriginal.clone();
+
+			p.applyTransform(t);
+
+
 			if(p.getNormal().z > 0) continue;
 
 			int polyHeight = (int)Math.floor(p.getBounds().getMaxY());
 
 			if((polyHeight+1+(this.height/2)) < 0) continue;
-			EdgeListNode edgeList[] = new EdgeListNode[polyHeight+1+(this.height/2)]; //TODO;
+			EdgeListNode edgeList[] = new EdgeListNode[polyHeight+2+(this.height/2)]; //adjusts for centred image
 
 			parseEdge(edgeList, p.vertex(0), p.vertex(1));
 			parseEdge(edgeList, p.vertex(1), p.vertex(2));
 			parseEdge(edgeList, p.vertex(2), p.vertex(0));
 
-			long start = System.currentTimeMillis();
-			drawToZBuffer(p.getShade(lightSource, intensity, ambience), edgeList);
-			if(System.currentTimeMillis() - start > 10){
-				System.out.println(System.currentTimeMillis() - start);
-			}
+			drawToZBuffer(p.getShade(lightSourceCopy, intensity, ambience), edgeList);
 		}
 
 
 	}
 
+	/**
+	 * Interpolates between two vertices adding the values to an edgelist
+	 * @param edgeList
+	 * @param from
+	 * @param to
+	 */
 	private void parseEdge(EdgeListNode[] edgeList, Vector3D from, Vector3D to){
 		Vector3D a = from.y < to.y ? from : to;
 		Vector3D b = a == from ? to : from;
@@ -223,25 +262,26 @@ public class RenderEngine {
 		float x = a.x;
 		float z = a.z;
 
+		if(maxi < 0) return;
 		while(i < maxi){
 			if(i<0) {i++;x += mx;z += mz;continue;}
 			// Initialise the item in the edge list if it does not exist
 			if(edgeList[i] == null) edgeList[i] = new EdgeListNode();
-			edgeList[i].putPoint(x+(this.width/2), z);
+			edgeList[i].putPoint((int)x+(this.width/2), z);
 			i++;
 			x += mx;
 			z += mz;
 		}
-		if(maxi < 0) return;
 
-		if(edgeList[maxi] == null) edgeList[maxi] = new EdgeListNode();
-		edgeList[maxi].putPoint(x+(this.width/2), z);
 	}
 
+	/**
+	 * Refreshes the ZBuffer with empty values
+	 */
 	private void initialiseZBuffer(){
 		for(int h = 0; h < this.height; h++){
 			for(int w = 0; w < this.width; w++){
-				colourBuffer[w][h] = Color.BLACK;
+				colourBuffer[w][h] = Color.WHITE;
 				zBuffer[w][h] = Integer.MAX_VALUE;
 			}
 		}
@@ -258,6 +298,7 @@ public class RenderEngine {
 
 			while(x <= (int)Math.floor(node.rightX())){ //TODO round up?
 				if(x < 0 || y < 0 || x >= width || y >= height) {x++;z += mz; continue;}
+				
 				if(z < zBuffer[x][y]){
 					zBuffer[x][y] = z;
 					colourBuffer[x][y] = colour;
@@ -265,7 +306,6 @@ public class RenderEngine {
 				x++;
 				z += mz;
 			}
-
 		}
 	}
 

@@ -1,11 +1,8 @@
 package models;
 
 import java.awt.Color;
-import java.awt.Rectangle;
 import java.awt.geom.Rectangle2D;
 import java.util.Formatter;
-
-import controllers.Transform;
 
 public class Polygon {
 
@@ -30,9 +27,22 @@ public class Polygon {
 		bounds();
 		height();
 	}
+	
+	/**
+	 * A constructor for cloning this polygon
+	 */
+	private Polygon(Polygon p){
+		hidden = false;
+		this.vertices = p.vertices.clone();
+		this.reflectivity = p.reflectivity;
+		
+		calculateNormal();
+		bounds();
+		height();
+	}
 
 	public Color getShade(Vector3D lightNormal, Color intensity, Color ambience){
-		float costh = normal.dotProduct(lightNormal);
+		float costh = normal.cosTheta(lightNormal);
 
 		// Colour component intensity
 		float ir = intensity.getRed() / 255f;
@@ -71,6 +81,7 @@ public class Polygon {
 
 		bounds();
 		calculateNormal();
+		height();
 	}
 
 	private void bounds(){
@@ -205,5 +216,9 @@ public class Polygon {
 		assert(vertexNo >= 0 && vertexNo <= 2);
 		if(vertexNo < 0 || vertexNo > 2) return null;
 		return vertices[vertexNo];
+	}
+	
+	public Polygon clone(){
+		return new Polygon(this);
 	}
 }
