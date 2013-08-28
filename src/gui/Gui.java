@@ -1,6 +1,7 @@
 package gui;
 
 import java.awt.BorderLayout;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -37,7 +38,7 @@ public class Gui extends JFrame{
 
 	private DrawPanel drawPanel;
 	private RenderEngine renderEngine;
-	private Dimension panelSize = new Dimension(600,600);
+	private Dimension panelSize = new Dimension(700,400);
 	private JRadioManager radioManager;
 	private JRadioButton[] buttons;
 	private JSlider slider;
@@ -161,24 +162,34 @@ public class Gui extends JFrame{
 		colourPanel.setLayout(new BoxLayout(colourPanel, BoxLayout.Y_AXIS));
 		colourPanel.setBorder(BorderFactory.createTitledBorder("Colour"));
 
-		// TODO add teh ambience and intensity sliders (+ add to frame) and creat their events
+		// Ambience Slider
 		JLabel ambienceLabel = new JLabel("Ambience: ");
-		ambienceSlider = new JSlider(0,50,25);
+		ambienceSlider = new JSlider(0,255,127);
 		ambienceSlider.setPreferredSize(new Dimension(150, 16));
 
 		ambienceSlider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent arg0) {
-				if(renderEngine == null) return;
-				renderEngine.scale((float)slider.getValue() / ((float)ambienceSlider.getMaximum()/2));
-				renderEngine.applyTransform();
+				renderEngine.setAmbience((float)ambienceSlider.getValue() / (float)ambienceSlider.getMaximum());
+			}});
+
+		// Ambience Slider
+		JLabel intensityLabel = new JLabel("Intensity: ");
+		intensitySlider = new JSlider(0,255,127);
+		intensitySlider.setPreferredSize(new Dimension(150, 16));
+
+		intensitySlider.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent arg0) {
+				renderEngine.setIntensity((float)intensitySlider.getValue() / (float)intensitySlider.getMaximum());
 			}});
 
 		colourPanel.add(ambienceLabel);
 		colourPanel.add(ambienceSlider);
+		colourPanel.add(intensityLabel);
+		colourPanel.add(intensitySlider);
 
 		// Create the Reset panel
-
 		JButton resetButton = new JButton("Reset Model");
 		resetButton.setPreferredSize(new Dimension(150, 30));
 		resetButton.addActionListener(new ActionListener(){
@@ -189,6 +200,8 @@ public class Gui extends JFrame{
 				catch(IOException e){JOptionPane.showConfirmDialog(Gui.this, "Failed to reset, could not reopen polygon file.");}
 				renderEngine.draw();
 				slider.setValue(slider.getMaximum() / 2);
+				ambienceSlider.setValue(ambienceSlider.getMaximum() / 2);
+				intensitySlider.setValue(intensitySlider.getMaximum() / 2);
 			}
 		});
 
@@ -209,6 +222,11 @@ public class Gui extends JFrame{
 		gbc.gridy = 1;
 		gbc.gridheight = 1;
 		topPanel.add(resetButton, gbc);
+		
+		gbc.gridx = 2;
+		gbc.gridy = 0;
+		gbc.gridheight = 2;
+		topPanel.add(colourPanel, gbc);
 		return topPanel;
 	}
 
@@ -274,7 +292,16 @@ public class Gui extends JFrame{
 			renderEngine.applyTransform();
 		}
 
-		@Override	public void mouseMoved(MouseEvent arg0) {}
+		@Override	public void mouseMoved(MouseEvent arg0) {
+			if(renderEngine == null) return;
+			if(renderEngine.containsPoint(arg0.getPoint())){
+				Cursor cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR); 
+			    setCursor(cursor);
+			}
+			else{
+				setCursor(Cursor.getDefaultCursor());
+			}
+		}
 
 	}
 
@@ -288,7 +315,8 @@ public class Gui extends JFrame{
 
 		@Override
 		public void mousePressed(MouseEvent arg0) {
-			dragHandler.startDrag(arg0.getPoint());
+			if(renderEngine.containsPoint(arg0.getPoint()) || (radioManager.getSelectedIndex() == 1 && arg0.isControlDown()))
+				dragHandler.startDrag(arg0.getPoint());
 		}
 
 		@Override

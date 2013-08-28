@@ -3,6 +3,7 @@ package controllers;
 import gui.Gui;
 
 import java.awt.Color;
+import java.awt.Point;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
@@ -15,12 +16,6 @@ import models.Polygon;
 import models.Transform;
 import models.Vector3D;
 
-// TODO javadoc/commenting
-// Change the lightsource to be adjustable (intensity) and handle multiple sources
-// write report
-
-
-
 public class RenderEngine {
 
 	// TODO use an array set to no of lines - 1
@@ -32,8 +27,8 @@ public class RenderEngine {
 	private int height;
 	private Color colourBuffer[][];
 	private float zBuffer[][];
-	private Color intensity = new Color(100,100,100);
-	private Color ambience = new Color(200,200,200);
+	private float intensity = 0.5f;
+	private float ambience = 0.5f;
 	private float zMin;
 	private float zMax;
 	private Transform translate;
@@ -50,12 +45,19 @@ public class RenderEngine {
 		initialiseRenderer();
 	}
 
+	public boolean containsPoint(Point p){
+		if(p.x < 0 || p.y < 0 || p.x >= zBuffer[0].length || p.y >= zBuffer.length) return false;
+		return zBuffer[p.y][p.x] != Float.MAX_VALUE;
+	}
+	
 	private void initialiseRenderer(){
-		colourBuffer = new Color[width][height];
-		zBuffer = new float[width][height];
+		colourBuffer = new Color[height][width];
+		zBuffer = new float[height][width];
 		scale = null;
 		translate = null;
 		rotate = null;
+		ambience = 0.5f;
+		intensity = 0.5f;
 	}
 
 	public void openModel(String file) throws IOException{
@@ -119,6 +121,16 @@ public class RenderEngine {
 
 	public void scale(float s){
 		scale = Transform.newScale(s, s, s);
+		draw();
+	}
+	
+	public void setAmbience(float ambience){
+		this.ambience = ambience;
+		draw();
+	}
+	
+	public void setIntensity(float intensity){
+		this.intensity = intensity;
 		draw();
 	}
 
@@ -212,8 +224,7 @@ public class RenderEngine {
 		for (int x = 0; x < this.width; x++){
 			for (int y = 0; y < this.height; y++){
 
-				if(x >= this.width || x >= this.height) continue;
-				img.setRGB(x, y, colourBuffer[x][y].getRGB());
+				img.setRGB(x, y, colourBuffer[y][x].getRGB());
 			}
 		}
 
@@ -294,8 +305,8 @@ public class RenderEngine {
 	private void initialiseZBuffer(){
 		for(int h = 0; h < this.height; h++){
 			for(int w = 0; w < this.width; w++){
-				colourBuffer[w][h] = Color.WHITE;
-				zBuffer[w][h] = Integer.MAX_VALUE;
+				colourBuffer[h][w] = Color.WHITE;
+				zBuffer[h][w] = Float.MAX_VALUE;
 			}
 		}
 	}
@@ -312,9 +323,9 @@ public class RenderEngine {
 			while(x <= (int)Math.floor(node.rightX())){ //TODO round up?
 				if(x < 0 || y < 0 || x >= width || y >= height) {x++;z += mz; continue;}
 
-				if(z < zBuffer[x][y]){
-					zBuffer[x][y] = z;
-					colourBuffer[x][y] = colour;
+				if(z < zBuffer[y][x]){
+					zBuffer[y][x] = z;
+					colourBuffer[y][x] = colour;
 				}
 				x++;
 				z += mz;

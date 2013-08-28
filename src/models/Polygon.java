@@ -41,18 +41,18 @@ public class Polygon {
 		height();
 	}
 
-	public Color getShade(Vector3D lightNormal, Color intensity, Color ambience){
+	public Color getShade(Vector3D lightNormal, float intensity, float ambience){
 		float costh = normal.cosTheta(lightNormal);
 
 		// Colour component intensity
-		float ir = intensity.getRed() / 255f;
-		float ig = intensity.getGreen() / 255f;
-		float ib = intensity.getBlue() / 255f;
+		float ir = intensity;
+		float ig = intensity;
+		float ib = intensity;
 
 		// Colour component ambience
-		float ar = ambience.getRed() / 255f;
-		float ag = ambience.getGreen() / 255f;
-		float ab = ambience.getBlue() / 255f;
+		float ar = ambience;
+		float ag = ambience;
+		float ab = ambience;
 
 		int r = (int)((ar + (ir * costh)) * reflectivity.getRed());
 		int g = (int)((ag + (ig * costh)) * reflectivity.getGreen());
