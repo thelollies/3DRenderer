@@ -8,19 +8,23 @@ import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.image.BufferedImage;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
+import java.io.File;
+import java.io.IOException;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JSlider;
@@ -37,22 +41,70 @@ public class Gui extends JFrame{
 	private JRadioManager radioManager;
 	private JRadioButton[] buttons;
 	private JSlider slider;
-
+	private JSlider intensitySlider;
+	private JSlider ambienceSlider;
 	public Gui(String fileName){
 
 		setLayout(new BorderLayout());
 		add(createTopPanel(), BorderLayout.NORTH);
 		add(createRenderPanel(), BorderLayout.WEST);
+		setJMenuBar(createMenu());
 
-		// Start the render engine
-		renderEngine = new RenderEngine(this, fileName, panelSize.width, panelSize.height);
-		renderEngine.draw();
-
-		this.setFocusable(true);
+		setFocusable(true);
 		addListeners();
 
 		pack();
 		setVisible(true);
+	}
+
+	private JMenuBar createMenu() {
+		JMenuBar menu = new JMenuBar();
+		JMenu file = new JMenu("File");
+
+		JMenuItem fileOpen = new JMenuItem("Open");
+		JMenuItem fileExit = new JMenuItem("Exit");
+
+		fileOpen.setMnemonic(KeyEvent.VK_O);
+		fileExit.setMnemonic(KeyEvent.VK_E);
+
+		fileOpen.addActionListener(new ActionListener(){
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				// show open file dialogue then if it is a good file 
+				// kick off the renderer otherwise show a popup and back to waiting
+				JFileChooser open = new JFileChooser();
+				int choice = open.showDialog(Gui.this, "Open");
+				if(choice == JFileChooser.APPROVE_OPTION){
+					try{
+						startRenderer(open.getSelectedFile());
+					}
+					catch(IOException e){
+						JOptionPane.showConfirmDialog(Gui.this, "Incompatible File");
+					}
+				}
+			}
+		});
+		fileExit.addActionListener(new ActionListener(){
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				System.exit(0);
+			}
+		});
+
+		file.add(fileOpen);
+		file.add(fileExit);
+
+		menu.add(file);
+
+		return menu;
+	}
+
+	private void startRenderer(File file) throws IOException {
+		// Start the render engine
+		slider.setValue(slider.getMaximum() / 2);
+		renderEngine = new RenderEngine(this, panelSize.width, panelSize.height);
+		renderEngine.openModel(file.getAbsolutePath());
+		renderEngine.draw();
 	}
 
 	private void addListeners() {
@@ -68,8 +120,6 @@ public class Gui extends JFrame{
 	 */
 	private JPanel createTopPanel(){
 		JPanel topPanel = new JPanel(new GridBagLayout());
-
-		// TODO make the translate cursor a 4 arrow thing (resize one) and rotate the hand icon
 
 		// Create the panel of selection modes
 		JPanel selectionPanel = new JPanel();
@@ -98,12 +148,34 @@ public class Gui extends JFrame{
 		slider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent arg0) {
+				if(renderEngine == null) return;
 				renderEngine.scale((float)slider.getValue() / ((float)slider.getMaximum()/2));
 				renderEngine.applyTransform();
 			}});
 
 		sliderPanel.add(sliderLabel);
 		sliderPanel.add(slider);
+
+		// Create the colour sliders
+		JPanel colourPanel = new JPanel();
+		colourPanel.setLayout(new BoxLayout(colourPanel, BoxLayout.Y_AXIS));
+		colourPanel.setBorder(BorderFactory.createTitledBorder("Colour"));
+
+		// TODO add teh ambience and intensity sliders (+ add to frame) and creat their events
+		JLabel ambienceLabel = new JLabel("Ambience: ");
+		ambienceSlider = new JSlider(0,50,25);
+		ambienceSlider.setPreferredSize(new Dimension(150, 16));
+
+		ambienceSlider.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent arg0) {
+				if(renderEngine == null) return;
+				renderEngine.scale((float)slider.getValue() / ((float)ambienceSlider.getMaximum()/2));
+				renderEngine.applyTransform();
+			}});
+
+		colourPanel.add(ambienceLabel);
+		colourPanel.add(ambienceSlider);
 
 		// Create the Reset panel
 
@@ -112,7 +184,9 @@ public class Gui extends JFrame{
 		resetButton.addActionListener(new ActionListener(){
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
-				renderEngine.resetModel();
+				if(renderEngine == null) return;
+				try{renderEngine.resetModel();}
+				catch(IOException e){JOptionPane.showConfirmDialog(Gui.this, "Failed to reset, could not reopen polygon file.");}
 				renderEngine.draw();
 				slider.setValue(slider.getMaximum() / 2);
 			}
@@ -165,7 +239,7 @@ public class Gui extends JFrame{
 		 */
 		@Override
 		public void mouseDragged(MouseEvent arg0) {
-
+			if(renderEngine == null) return;
 			if(hold != null){
 				Point pos = arg0.getPoint();
 
@@ -173,10 +247,12 @@ public class Gui extends JFrame{
 
 				switch(radioManager.getSelectedIndex()){
 				case(0):
-					renderEngine.translate(offset.x, offset.y);
+					renderEngine.translate(offset.x, offset.y, 0f);
 				break;
 				case(1):
-					renderEngine.rotate(offset.x, offset.y);
+					if(arg0.isShiftDown()) renderEngine.rotate(0f, 0f, offset.y);
+					else if(arg0.isControlDown()) renderEngine.rotateLightSource(offset.x, offset.y, 0f);
+					else renderEngine.rotate(offset.x, offset.y, 0f);
 				break;
 				}
 
@@ -193,6 +269,7 @@ public class Gui extends JFrame{
 		}
 
 		public void stopDrag(){
+			if(renderEngine == null) return;
 			hold = null;
 			renderEngine.applyTransform();
 		}
@@ -230,5 +307,5 @@ public class Gui extends JFrame{
 		System.out.println(Math.ceil(-64.997856f));
 		new Gui("monkey.txt");
 	}
-	
+
 }

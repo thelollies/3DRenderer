@@ -16,9 +16,8 @@ import models.Transform;
 import models.Vector3D;
 
 // TODO javadoc/commenting
-// Change the lightsource to be adjustable (direction and intensity) and handle multiple sources
-// add ctrl or shift combo for z translating (and maybe z rotate?)
-// add proper loading & saving
+// Change the lightsource to be adjustable (intensity) and handle multiple sources
+// write report
 
 
 
@@ -39,14 +38,14 @@ public class RenderEngine {
 	private float zMax;
 	private Transform translate;
 	private Transform rotate;
+	private Transform lightSourceRotate;
 	private Transform scale;
 	private String file;
 
-	public RenderEngine(Gui gui, String file, int width, int height){
+	public RenderEngine(Gui gui, int width, int height){
 		this.gui = gui;
 		this.width = width;
 		this.height = height;
-		this.file = file;
 
 		initialiseRenderer();
 	}
@@ -57,14 +56,15 @@ public class RenderEngine {
 		scale = null;
 		translate = null;
 		rotate = null;
-		
+	}
+
+	public void openModel(String file) throws IOException{
+		this.file = file;
+
 		// Load lightsource and polygons
-		try{
-			BufferedReader input = new BufferedReader(new FileReader(file));
-			lightSource = Vector3D.loadVector3D(input.readLine());
-			polygons = loadPolygons(input);
-		}
-		catch(IOException e){e.printStackTrace();System.exit(0);}
+		BufferedReader input = new BufferedReader(new FileReader(file));
+		lightSource = Vector3D.loadVector3D(input.readLine());
+		polygons = loadPolygons(input);
 
 		// Load polygons
 		calculateBounds();
@@ -85,28 +85,35 @@ public class RenderEngine {
 
 			transformPolygons(Transform.newScale(scale, scale, scale));
 		}
-
 	}
 
-	public void resetModel(){
+	public void resetModel() throws IOException{
 		initialiseRenderer();
+		openModel(this.file);
 	}
-	
+
 	private void transformPolygons(Transform t) {
 		for(Polygon p : polygons)
 			p.applyTransform(t);
 		calculateBounds();
-		//lightSource = t.multiply(lightSource);
 	}
 
-	public void rotate(float x, float y){
+	public void rotate(float x, float y, float z){
 		rotate = Transform.newYRotation((-2*x)/this.width);
 		rotate = rotate.compose(Transform.newXRotation((2*y)/this.height));
+		rotate = rotate.compose(Transform.newZRotation((-2*z)/this.width));
+		draw();
+	}
+	
+	public void rotateLightSource(int x, int y, float z) {
+		lightSourceRotate = Transform.newYRotation((-4*x)/this.width);
+		lightSourceRotate = lightSourceRotate.compose(Transform.newXRotation((4*y)/this.height));
+		lightSourceRotate = lightSourceRotate.compose(Transform.newZRotation((-4*z)/this.width));
 		draw();
 	}
 
-	public void translate(float x, float y){
-		translate = Transform.newTranslation(x, y, 0);
+	public void translate(float x, float y, float z){
+		translate = Transform.newTranslation(x, y, z);
 		draw();
 	}
 
@@ -125,6 +132,11 @@ public class RenderEngine {
 			transformPolygons(rotate);
 			lightSource = rotate.multiply(lightSource);
 			rotate = null;
+			draw();
+		}
+		else if(lightSourceRotate != null){
+			lightSource = lightSourceRotate.multiply(lightSource);
+			lightSourceRotate = null;
 			draw();
 		}
 	}
@@ -213,14 +225,15 @@ public class RenderEngine {
 	 */
 	private void generateZBuffer(){
 		Vector3D lightSourceCopy = lightSource.clone();
-		if(rotate != null)	lightSourceCopy = rotate.multiply(lightSource);
+		if(rotate != null)	lightSourceCopy = rotate.multiply(lightSourceCopy);
+		if(lightSourceRotate != null) lightSourceCopy = lightSourceRotate.multiply(lightSourceCopy);
 
 		Transform t = Transform.identity();
 		if(translate != null) t = t.compose(translate);
 		if(rotate != null) t = t.compose(rotate);
 		if(scale != null) t = t.compose(scale);
-		
-		
+
+
 		for(Polygon pOriginal : polygons){
 			Polygon p = pOriginal.clone();
 
@@ -298,7 +311,7 @@ public class RenderEngine {
 
 			while(x <= (int)Math.floor(node.rightX())){ //TODO round up?
 				if(x < 0 || y < 0 || x >= width || y >= height) {x++;z += mz; continue;}
-				
+
 				if(z < zBuffer[x][y]){
 					zBuffer[x][y] = z;
 					colourBuffer[x][y] = colour;
